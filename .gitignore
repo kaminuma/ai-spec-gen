@@ -15,7 +15,9 @@ ENV/
 outputs/
 *.md
 !README.md
-!docs/**/*.md
+
+# ドキュメント（設計書等の私的情報を含むためGit管理外）
+docs/
 
 # IDE
 .vscode/
