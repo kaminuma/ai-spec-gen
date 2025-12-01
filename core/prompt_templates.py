@@ -326,3 +326,238 @@ def generate_project_summary_prompt(data: dict) -> str:
 6. 箇条書きは3〜5件に収め、動詞は名詞形で簡潔に（例: 「タスク管理」「カテゴリ分類」）
 """
     return prompt.strip()
+
+
+# ============================================
+# Java/Spring Boot用のFew-Shot Examples
+# ============================================
+
+JAVA_ENTITY_DESCRIPTION_EXAMPLES = """
+### Few-Shot Examples (Entity説明の例)
+
+例1:
+Entity名: UserEntity
+テーブル名: users
+フィールド: user_id, username, email, password, created_at, updated_at
+アノテーション: @Entity, @Table, @Id, @GeneratedValue
+
+説明: ユーザーアカウント情報を永続化し、認証とアプリケーション全体のユーザー管理を担う
+
+---
+
+例2:
+Entity名: TodoEntity
+テーブル名: todos
+フィールド: todo_id, title, description, completed, user_id, deadline
+アノテーション: @Entity, @Table, @Id, @ManyToOne
+
+説明: ユーザーのタスク情報を管理し、期限や完了状態を記録する
+
+---
+
+例3:
+Entity名: RefreshTokenEntity
+テーブル名: refresh_tokens
+フィールド: token_id, user_id, token, expires_at, created_at
+アノテーション: @Entity, @Table, @Id, @Column
+
+説明: リフレッシュトークンを永続化し、セキュアなトークン更新を実現する
+"""
+
+
+JAVA_CONTROLLER_DESCRIPTION_EXAMPLES = """
+### Few-Shot Examples (Controller説明の例)
+
+例1:
+Controller名: TodoController
+ベースパス: /api/todos
+エンドポイント: GET /, POST /, PUT /{id}, DELETE /{id}
+
+説明: TodoのCRUD操作を提供し、RESTful APIとしてクライアントにタスク管理機能を公開する
+
+---
+
+例2:
+Controller名: AuthController
+ベースパス: /auth
+エンドポイント: POST /login, POST /register, POST /refresh, POST /logout
+
+説明: ユーザー認証とトークン管理を担当し、セキュアな認証フローを提供する
+
+---
+
+例3:
+Controller名: UserController
+ベースパス: /api/users
+エンドポイント: GET /{id}, PUT /{id}, DELETE /{id}, GET /me
+
+説明: ユーザー情報の取得と更新を提供し、プロフィール管理機能を公開する
+"""
+
+
+JAVA_SERVICE_DESCRIPTION_EXAMPLES = """
+### Few-Shot Examples (Service説明の例)
+
+例1:
+Service名: TodoService
+メソッド: findAll(), findById(), create(), update(), delete()
+
+説明: Todoのビジネスロジックを集約し、永続化層とコントローラー層を仲介する
+
+---
+
+例2:
+Service名: AuthService
+メソッド: login(), register(), refreshToken(), validateToken()
+
+説明: 認証処理とトークン管理のロジックを担当し、セキュリティ要件を実装する
+
+---
+
+例3:
+Service名: NotificationService
+メソッド: sendEmail(), sendPushNotification(), scheduleReminder()
+
+説明: 通知処理を担当し、メールやプッシュ通知の送信ロジックを提供する
+"""
+
+
+# ============================================
+# Java用のPrompt Generator Functions
+# ============================================
+
+def generate_java_entity_prompt(entity: dict) -> str:
+    """JPA Entityの説明を生成するためのプロンプト"""
+    entity_name = entity['name']
+    table_name = entity.get('table', 'N/A')
+    fields = ', '.join([f['name'] for f in entity.get('fields', [])])
+    annotations = set()
+    for field in entity.get('fields', []):
+        annotations.update(field.get('annotations', []))
+    annotation_str = ', '.join([f'@{a}' for a in annotations])
+
+    prompt = f"""
+{JAVA_ENTITY_DESCRIPTION_EXAMPLES}
+
+### 新しいEntityの説明を生成
+
+Entity名: {entity_name}
+テーブル名: {table_name}
+フィールド: {fields}
+アノテーション: {annotation_str}
+
+上記のFew-Shot例に倣って、このEntityの役割を**1文**で簡潔に日本語で説明してください。
+
+説明のフォーマット:
+「〜を永続化し、〜を担う」または「〜を管理し、〜を記録する」
+
+回答は説明文のみを返してください（前置きや補足は不要）。
+"""
+    return prompt.strip()
+
+
+def generate_java_controller_prompt(controller: dict) -> str:
+    """REST Controllerの説明を生成するためのプロンプト"""
+    controller_name = controller['name']
+    base_path = controller.get('base_path', '/')
+    endpoints = controller.get('endpoints', [])
+    endpoint_summary = ', '.join([f"{e['method']} {e['path']}" for e in endpoints[:5]])
+
+    prompt = f"""
+{JAVA_CONTROLLER_DESCRIPTION_EXAMPLES}
+
+### 新しいControllerの説明を生成
+
+Controller名: {controller_name}
+ベースパス: {base_path}
+エンドポイント: {endpoint_summary}
+
+上記のFew-Shot例に倣って、このControllerの責務を**1文**で簡潔に日本語で説明してください。
+
+説明のフォーマット:
+「〜を提供し、〜を公開する」または「〜を担当し、〜を提供する」
+
+回答は説明文のみを返してください（前置きや補足は不要）。
+"""
+    return prompt.strip()
+
+
+def generate_java_service_prompt(service: dict) -> str:
+    """Serviceの説明を生成するためのプロンプト"""
+    service_name = service['name']
+    methods = ', '.join([m['name'] + '()' for m in service.get('methods', [])])
+
+    prompt = f"""
+{JAVA_SERVICE_DESCRIPTION_EXAMPLES}
+
+### 新しいServiceの説明を生成
+
+Service名: {service_name}
+メソッド: {methods}
+
+上記のFew-Shot例に倣って、このServiceの責務を**1文**で簡潔に日本語で説明してください。
+
+説明のフォーマット:
+「〜を担当し、〜を提供する」または「〜を集約し、〜を実装する」
+
+回答は説明文のみを返してください（前置きや補足は不要）。
+"""
+    return prompt.strip()
+
+
+def generate_java_project_summary_prompt(data: dict) -> str:
+    """Java/Spring Bootプロジェクト全体のサマリーを生成するためのプロンプト"""
+    entities_count = len(data.get('entities', []))
+    controllers_count = len(data.get('controllers', []))
+    services_count = len(data.get('services', []))
+    endpoints_count = len(data.get('rest_endpoints', []))
+
+    entities_list = ', '.join([e['name'] for e in data.get('entities', [])])
+
+    prompt = f"""
+あなたはJava/Spring Bootプロジェクトの技術仕様書を作成するテクニカルライターです。
+以下の解析データは「実際のSpring Bootアプリケーション」のコード解析結果です。
+このアプリケーションのみについて説明し、ツールやAIについては一切言及しないでください。
+
+## 解析対象プロジェクトのデータ
+
+### アーキテクチャ構成
+- **Entities**: {entities_count}個 ({entities_list or 'なし'})
+- **Controllers**: {controllers_count}個
+- **Services**: {services_count}個
+- **REST Endpoints**: {endpoints_count}個
+
+### 推測のヒント
+- Entitiesの名前から、このアプリケーションが管理するドメインを推測してください
+- REST API構成から、SPAやモバイルアプリ向けのバックエンドの可能性
+- Servicesの存在から、ビジネスロジックが分離された設計
+
+## 出力要件
+
+以下のMarkdown構造**のみ**で出力してください。先頭の挨拶や前置き、---などの区切り、余計なテキストを一切追加しないでください。
+
+## プロジェクト概要
+
+[このSpring Bootアプリケーションが何を目的としているか、どんな問題を解決するかを2〜3文で説明]
+
+## 主要機能
+
+- [機能1: 具体的な機能名と簡潔な説明]
+- [機能2: 具体的な機能名と簡潔な説明]
+- [機能3: 具体的な機能名と簡潔な説明]
+
+## 技術的な特徴
+
+- [特徴1: Spring Bootの機能やアーキテクチャパターン]
+- [特徴2: API設計やデータモデリングの特徴]
+- [特徴3: 認証・認可やセキュリティ設計]
+
+## 重要な注意事項
+
+1. **このツール自体（AI Spec Generator）について説明しないでください**
+2. **解析対象のSpring Bootアプリケーション**についてのみ記述してください
+3. 推測が難しい場合は、EntitiesやController名から最も妥当なドメインを推測してください
+4. 回答は上記のMarkdown構造のみ。コードブロック・装飾・注釈・謝罪・質問・補足は禁止
+5. 箇条書きは3〜5件に収め、動詞は名詞形で簡潔に
+"""
+    return prompt.strip()
