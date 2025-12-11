@@ -8,7 +8,8 @@ from typing import Dict, Any, List
 class MarkdownGenerator:
     """Markdown生成器"""
 
-    def __init__(self):
+    def __init__(self, plugin_type='laravel'):
+        self.plugin_type = plugin_type
         self.lines = []
         self.ai_descriptions = {}
 
@@ -26,6 +27,14 @@ class MarkdownGenerator:
         self.lines = []
         self.ai_descriptions = ai_descriptions or {}
 
+        # プラグインタイプによって分岐
+        if self.plugin_type == 'java':
+            return self._generate_java(data)
+        else:
+            return self._generate_laravel(data)
+
+    def _generate_laravel(self, data: Dict[str, Any]) -> str:
+        """Laravel用のMarkdown生成"""
         # タイトル
         self.add_header("Laravel プロジェクト仕様書", level=1)
         self.add_line()
@@ -582,3 +591,309 @@ class MarkdownGenerator:
             return word + 'es'
         else:
             return word + 's'
+
+    def _generate_java(self, data: Dict[str, Any]) -> str:
+        """Java/Spring Boot用のMarkdown生成"""
+        # タイトル
+        self.add_header("Java プロジェクト仕様書", level=1)
+        self.add_line()
+
+        # プロジェクト概要（AIが生成）
+        if self.ai_descriptions.get('project_summary'):
+            self.add_line(self.ai_descriptions['project_summary'])
+            self.add_line()
+            self.add_line("---")
+            self.add_line()
+
+        # REST Endpoints（最初に配置）
+        if data.get('rest_endpoints'):
+            self._generate_java_rest_endpoints_section(data['rest_endpoints'])
+
+        # Database Schema (Entities)
+        if data.get('entities'):
+            self._generate_java_entities_section(data['entities'])
+
+        # Repositories
+        if data.get('repositories'):
+            self._generate_java_repositories_section(data['repositories'])
+
+        # Controllers
+        if data.get('controllers'):
+            self._generate_java_controllers_section(data['controllers'])
+
+        # Services
+        if data.get('services'):
+            self._generate_java_services_section(data['services'])
+
+        # DTOs
+        if data.get('dtos'):
+            self._generate_java_dtos_section(data['dtos'])
+
+        # Configs
+        if data.get('configs'):
+            self._generate_java_configs_section(data['configs'])
+
+        return '\n'.join(self.lines)
+
+    def _generate_java_entities_section(self, entities: List[Dict]):
+        """Java Entitiesセクションを生成"""
+        self.add_header("Database Schema (Entities)", level=2)
+        self.add_line()
+
+        for entity in entities:
+            self.add_header(f"Entity: {entity['name']}", level=3)
+            self.add_line(f"**テーブル**: `{entity['table']}`")
+            self.add_line(f"**ファイル**: `{entity['file']}`")
+            self.add_line()
+
+            # AI生成の説明
+            description = self.ai_descriptions.get(f"entity_{entity['name']}")
+            if description:
+                self.add_line(f"**説明**: {description}")
+                self.add_line()
+
+            if entity.get('fields'):
+                self.add_line("**フィールド**:")
+                for field in entity['fields']:
+                    annotations = ', '.join(f"@{a}" for a in field.get('annotations', []))
+                    self.add_line(f"- `{field['name']}` ({field['type']}) {annotations}")
+                self.add_line()
+
+        self.add_line()
+
+    def _generate_java_controllers_section(self, controllers: List[Dict]):
+        """Java Controllersセクションを生成"""
+        self.add_header("Controllers", level=2)
+        self.add_line()
+
+        for controller in controllers:
+            self.add_header(f"Controller: {controller['name']}", level=3)
+            self.add_line(f"**ファイル**: `{controller['file']}`")
+            self.add_line(f"**ベースパス**: `{controller.get('base_path', '/')}`")
+            self.add_line()
+
+            # AI生成の説明
+            description = self.ai_descriptions.get(f"controller_{controller['name']}")
+            if description:
+                self.add_line(f"**説明**: {description}")
+                self.add_line()
+
+            if controller.get('endpoints'):
+                self.add_line("**エンドポイント**:")
+                for endpoint in controller['endpoints']:
+                    self.add_line(f"- `{endpoint['method']} {endpoint['path']}` → `{endpoint['handler']}()`")
+                self.add_line()
+
+        self.add_line()
+
+    def _generate_java_services_section(self, services: List[Dict]):
+        """Java Servicesセクションを生成"""
+        self.add_header("Services (ビジネスロジック)", level=2)
+        self.add_line()
+
+        for service in services:
+            self.add_header(f"Service: {service['name']}", level=3)
+            self.add_line(f"**ファイル**: `{service['file']}`")
+            self.add_line()
+
+            # AI生成の説明
+            description = self.ai_descriptions.get(f"service_{service['name']}")
+            if description:
+                self.add_line(f"**説明**: {description}")
+                self.add_line()
+
+            if service.get('methods'):
+                self.add_line("**メソッド**:")
+                for method in service['methods']:
+                    self.add_line(f"- `{method['name']}({method['parameters']})` → `{method['return_type']}`")
+                self.add_line()
+
+        self.add_line()
+
+    def _generate_java_repositories_section(self, repositories: List[Dict]):
+        """Java Repositoriesセクションを生成"""
+        self.add_header("Repositories (データアクセス層)", level=2)
+        self.add_line()
+
+        for repo in repositories:
+            self.add_header(f"Repository: {repo['name']}", level=3)
+            self.add_line(f"**ファイル**: `{repo['file']}`")
+            self.add_line(f"**Entity**: `{repo.get('entity', 'Unknown')}<{repo.get('id_type', 'ID')}>`")
+            self.add_line()
+
+            if repo.get('custom_methods'):
+                self.add_line("**カスタムメソッド**:")
+                for method in repo['custom_methods']:
+                    self.add_line(f"- `{method['name']}({method['parameters']})` → `{method['return_type']}`")
+                self.add_line()
+
+        self.add_line()
+
+    def _generate_java_rest_endpoints_section(self, endpoints: List[Dict]):
+        """Java REST Endpointsセクションを生成"""
+        self.add_header("REST API Endpoints", level=2)
+        self.add_line()
+
+        self.add_line("| Method | Path | Controller | Handler |")
+        self.add_line("|--------|------|------------|---------|")
+
+        for endpoint in endpoints:
+            self.add_line(
+                f"| {endpoint['method']} | `{endpoint['path']}` | {endpoint['controller']} | `{endpoint['handler']}()` |"
+            )
+
+        self.add_line()
+
+    def _generate_java_dtos_section(self, dtos: List[Dict]):
+        """Java DTOsセクションを生成"""
+        self.add_header("DTOs (Data Transfer Objects)", level=2)
+        self.add_line()
+
+        for dto in dtos:
+            self.add_header(f"DTO: {dto['name']}", level=3)
+            self.add_line(f"**ファイル**: `{dto['file']}`")
+            self.add_line()
+
+            if dto.get('fields'):
+                self.add_line("**フィールド**:")
+                for field in dto['fields']:
+                    self.add_line(f"- `{field['name']}`: `{field['type']}`")
+                self.add_line()
+
+        self.add_line()
+
+    def _generate_java_configs_section(self, configs: List[Dict]):
+        """Java Configsセクションを生成"""
+        self.add_header("設定ファイル", level=2)
+        self.add_line()
+
+        for config in configs:
+            self.add_header(f"Config: {config['file']}", level=3)
+            self.add_line(f"**タイプ**: {config['type']}")
+            self.add_line()
+
+            if config['type'] == 'properties' and config.get('content'):
+                self.add_line("**設定内容**:")
+                for key, value in config['content'].items():
+                    self.add_line(f"- `{key}`: `{value}`")
+                self.add_line()
+            elif config.get('content'):
+                self.add_code_block(config['content'][:500], 'yaml')
+                self.add_line()
+
+        self.add_line()
+
+    def generate_java_parts(self, data: Dict[str, Any], ai_descriptions: Dict[str, str] = None) -> Dict[str, str]:
+        """
+        Java/Spring Boot用の複数Markdownパートを生成（Notion階層出力用）
+        Returns: {'overview': str, 'entities': str, 'api': str, 'services': str}
+        """
+        parts: Dict[str, List[str]] = {
+            'overview': [],
+            'entities': [],
+            'api': [],
+            'services': [],
+        }
+
+        self.ai_descriptions = ai_descriptions or {}
+
+        # --- Overview ---
+        def add_overview():
+            lines = parts['overview']
+            lines.append("# プロジェクト概要")
+            lines.append("")
+            if self.ai_descriptions.get('project_summary'):
+                lines.append(self.ai_descriptions['project_summary'])
+                lines.append("")
+        add_overview()
+
+        # --- Entities ---
+        def add_entities():
+            lines = parts['entities']
+            lines.append("# Entities (JPA)")
+            lines.append("")
+            for entity in data.get('entities', []):
+                lines.append(f"## Entity: {entity['name']}")
+                lines.append(f"**テーブル**: `{entity['table']}`")
+                lines.append(f"**ファイル**: `{entity['file']}`")
+                lines.append("")
+
+                # AI生成の説明
+                description = self.ai_descriptions.get(f"entity_{entity['name']}")
+                if description:
+                    lines.append(f"**説明**: {description}")
+                    lines.append("")
+
+                if entity.get('fields'):
+                    lines.append("**フィールド**:")
+                    for field in entity['fields']:
+                        annotations = ', '.join(f"@{a}" for a in field.get('annotations', []))
+                        lines.append(f"- `{field['name']}` ({field['type']}) {annotations}")
+                    lines.append("")
+        add_entities()
+
+        # --- API (Controllers + REST Endpoints) ---
+        def add_api():
+            lines = parts['api']
+            lines.append("# API (Controllers / Endpoints)")
+            lines.append("")
+
+            # Controllers
+            lines.append("## Controllers")
+            lines.append("")
+            for controller in data.get('controllers', []):
+                lines.append(f"### {controller['name']}")
+                lines.append(f"**ファイル**: `{controller['file']}`")
+                lines.append(f"**ベースパス**: `{controller.get('base_path', '/')}`")
+                lines.append("")
+
+                # AI生成の説明
+                description = self.ai_descriptions.get(f"controller_{controller['name']}")
+                if description:
+                    lines.append(f"**説明**: {description}")
+                    lines.append("")
+
+                if controller.get('endpoints'):
+                    lines.append("**エンドポイント**:")
+                    for endpoint in controller['endpoints']:
+                        lines.append(f"- `{endpoint['method']} {endpoint['path']}` → `{endpoint['handler']}()`")
+                    lines.append("")
+
+            # REST Endpoints一覧
+            if data.get('rest_endpoints'):
+                lines.append("## REST API Endpoints 一覧")
+                lines.append("")
+                lines.append("| Method | Path | Controller | Handler |")
+                lines.append("|--------|------|------------|---------|")
+                for endpoint in data['rest_endpoints']:
+                    lines.append(
+                        f"| {endpoint['method']} | `{endpoint['path']}` | {endpoint['controller']} | `{endpoint['handler']}()` |"
+                    )
+                lines.append("")
+        add_api()
+
+        # --- Services ---
+        def add_services():
+            lines = parts['services']
+            lines.append("# Services (ビジネスロジック)")
+            lines.append("")
+
+            for service in data.get('services', []):
+                lines.append(f"## Service: {service['name']}")
+                lines.append(f"**ファイル**: `{service['file']}`")
+                lines.append("")
+
+                # AI生成の説明
+                description = self.ai_descriptions.get(f"service_{service['name']}")
+                if description:
+                    lines.append(f"**説明**: {description}")
+                    lines.append("")
+
+                if service.get('methods'):
+                    lines.append("**メソッド**:")
+                    for method in service['methods']:
+                        lines.append(f"- `{method['name']}({method['parameters']})` → `{method['return_type']}`")
+                    lines.append("")
+        add_services()
+
+        return {k: '\n'.join(v) for k, v in parts.items()}

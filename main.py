@@ -316,6 +316,159 @@ def main():
             else:
                 print(f'\n⚠️  {args.output} 出力は未実装です')
 
+        elif args.plugin == 'java':
+            from plugins.java.parser import JavaParser
+            from core.markdown_generator import MarkdownGenerator
+
+            # パーサー初期化
+            if args.dir:
+                parser = JavaParser(args.dir)
+                print('\n🔍 Javaプロジェクト全体を解析中...')
+                data = parser.parse_all()
+            else:
+                print('エラー: Javaプラグインは --dir オプションが必要です')
+                sys.exit(1)
+
+            # 統計表示
+            print(f'\n📊 解析結果:')
+            print(f'  - Entities: {len(data.get("entities", []))}個')
+            print(f'  - Controllers: {len(data.get("controllers", []))}個')
+            print(f'  - Services: {len(data.get("services", []))}個')
+            print(f'  - Repositories: {len(data.get("repositories", []))}個')
+            print(f'  - DTOs: {len(data.get("dtos", []))}個')
+            print(f'  - REST Endpoints: {len(data.get("rest_endpoints", []))}個')
+            print(f'  - Configs: {len(data.get("configs", []))}個')
+
+            # AI補完（オプション）
+            ai_descriptions = {}
+            if not args.no_ai:
+                from core.ai_backend import get_ai_backend
+                from core.prompt_templates import (
+                    generate_java_entity_prompt,
+                    generate_java_controller_prompt,
+                    generate_java_service_prompt,
+                    generate_java_project_summary_prompt
+                )
+
+                print(f'\n🤖 AIで説明を補完中（Few-Shot学習使用）...')
+                backend_name = args.ai_backend or 'claude-code'
+                print(f'   使用するAI: {backend_name}')
+
+                try:
+                    ai = get_ai_backend(backend_name)
+
+                    # プロジェクト全体のサマリー生成
+                    print(f'   📋 プロジェクト概要を生成中...')
+                    try:
+                        project_summary = ai.generate(generate_java_project_summary_prompt(data))
+                        ai_descriptions['project_summary'] = project_summary
+                        print(f'   ✓ プロジェクト概要')
+                    except Exception as e:
+                        print(f'   ✗ プロジェクト概要: {e}')
+
+                    # Entities説明を生成
+                    if data.get('entities'):
+                        print(f'   🏛️  Entities説明を生成中...')
+                        for entity in data['entities']:
+                            try:
+                                description = ai.generate(generate_java_entity_prompt(entity))
+                                ai_descriptions[f"entity_{entity['name']}"] = description
+                                print(f'   ✓ Entity: {entity["name"]}')
+                            except Exception as e:
+                                print(f'   ✗ Entity {entity["name"]}: {e}')
+
+                    # Controllers説明を生成
+                    if data.get('controllers'):
+                        print(f'   🎮 Controllers説明を生成中...')
+                        for controller in data['controllers']:
+                            try:
+                                description = ai.generate(generate_java_controller_prompt(controller))
+                                ai_descriptions[f"controller_{controller['name']}"] = description
+                                print(f'   ✓ Controller: {controller["name"]}')
+                            except Exception as e:
+                                print(f'   ✗ Controller {controller["name"]}: {e}')
+
+                    # Services説明を生成
+                    if data.get('services'):
+                        print(f'   ⚙️  Services説明を生成中...')
+                        for service in data['services']:
+                            try:
+                                description = ai.generate(generate_java_service_prompt(service))
+                                ai_descriptions[f"service_{service['name']}"] = description
+                                print(f'   ✓ Service: {service["name"]}')
+                            except Exception as e:
+                                print(f'   ✗ Service {service["name"]}: {e}')
+
+                    total_descriptions = len([k for k in ai_descriptions.keys() if k != 'project_summary'])
+                    print(f'\n   ✅ 完了: {total_descriptions}個の説明を生成')
+
+                except Exception as e:
+                    print(f'\n   ❌ AI補完でエラーが発生しました: {e}')
+                    if args.verbose:
+                        import traceback
+                        traceback.print_exc()
+
+            # Markdown生成
+            generator = MarkdownGenerator('java')
+            output_path = Path(args.output_file)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Markdown生成
+            markdown = generator.generate(data, ai_descriptions)
+
+            if args.output == 'markdown':
+                with open(output_path, 'w', encoding='utf-8') as f:
+                    f.write(markdown)
+                print(f'✅ 仕様書を生成しました: {output_path}')
+                print(f'   サイズ: {len(markdown)} 文字')
+
+            elif args.output in ['notion', 'notion-hier']:
+                # まずローカル保存
+                with open(output_path, 'w', encoding='utf-8') as f:
+                    f.write(markdown)
+                print(f'✅ 仕様書を生成しました: {output_path}')
+                print(f'   サイズ: {len(markdown)} 文字')
+
+                from core.notion_exporter import NotionExporter, get_notion_credentials
+
+                print('\n🌐 Notionへアップロード中...')
+                token, parent_page_id = get_notion_credentials(args.notion_token, args.notion_page_id)
+
+                try:
+                    exporter = NotionExporter(token)
+                    if args.output == 'notion':
+                        page_url = exporter.upload_markdown(markdown, parent_page_id, title=output_path.stem or 'Java Spec')
+                        print(f'✅ Notion にアップロードしました: {page_url}')
+                    else:
+                        # 階層モード: 複数パートをアップロード
+                        parts = generator.generate_java_parts(data, ai_descriptions)
+                        if args.notion_flat:
+                            emoji_map = {
+                                'overview': '🗂️',
+                                'entities': '🏛️',
+                                'api': '🔗',
+                                'services': '⚙️',
+                            }
+                            title_map = {
+                                'overview': '概要',
+                                'entities': 'エンティティ',
+                                'api': 'API仕様',
+                                'services': 'ビジネスロジック',
+                            }
+                            urls = exporter.upload_hierarchy_flat(parts, parent_page_id, emoji_map=emoji_map, title_map=title_map)
+                            print(f'✅ Notion 階層（フラット）にアップロードしました:')
+                            for k, v in urls.items():
+                                print(f'   - {k}: {v}')
+                        else:
+                            root_title = output_path.stem or 'Java Spec'
+                            root_url = exporter.upload_hierarchy(parts, parent_page_id, root_title)
+                            print(f'✅ Notion 階層にアップロードしました: {root_url}')
+                except Exception as e:
+                    print(f'❌ Notion へのアップロードに失敗しました: {e}')
+
+            else:
+                print(f'\n⚠️  {args.output} 出力は未実装です')
+
         else:
             print(f'\n⚠️  {args.plugin} プラグインは未実装です')
 
